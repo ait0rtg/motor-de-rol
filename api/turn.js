@@ -28,13 +28,17 @@ module.exports = async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth },
       body: JSON.stringify({
-        model: m, temperature: 0.8, max_tokens: 1400,
+        model: m, temperature: 0.8, max_tokens: 2500,
         ...(json && useOpenAI ? { response_format: { type: 'json_object' } } : {}),
         messages: [{ role: 'system', content: String(system || '').slice(0, 30000) }, { role: 'user', content: String(msg || '').slice(0, 30000) }]
       })
     });
     const d = await r.json();
-    if (!r.ok) return res.status(502).json({ error: (d.error && (d.error.message || d.error)) || 'Error del modelo' });
+    if (!r.ok) {
+      const m = String((d.error && (d.error.message || d.error)) || 'Error del modelo');
+      if (/credit card/i.test(m)) return res.status(402).json({ error: 'El narrador Claude necesita que añadas una tarjeta en Vercel (equipo Aitor\'s projects → AI Gateway). Vercel da créditos gratis al añadirla. Mientras tanto no puede narrar.' });
+      return res.status(502).json({ error: m });
+    }
     let text = d.choices[0].message.content || '';
     if (json) { const i = text.indexOf('{'), k = text.lastIndexOf('}'); if (i >= 0 && k > i) text = text.slice(i, k + 1); }
     res.status(200).json({ text });
