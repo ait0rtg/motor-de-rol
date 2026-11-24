@@ -35,6 +35,10 @@ function Auth() {
     <div className="wrap">
       <h1>⚔️ Motor de Rol</h1>
       <div className="card">
+        <button className="btn main" onClick={guest}>🎲 Jugar sin cuenta</button>
+        <p style={{ fontSize: 13, color: '#9aa3b8' }}>Tus partidas se guardan en este navegador. Si cierras sesión o borras los datos del navegador, se pierden.</p>
+      </div>
+      <div className="card">
         <label>Correo</label>
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
         <label>Contraseña (mínimo 6 caracteres)</label>
@@ -44,10 +48,6 @@ function Auth() {
           <button className="btn" onClick={() => setMode(mode === 'in' ? 'up' : 'in')}>{mode === 'in' ? 'No tengo cuenta' : 'Ya tengo cuenta'}</button>
         </div>
         {msg && <p style={{ color: '#ff9aa9' }}>{msg}</p>}
-      </div>
-      <div className="card">
-        <button className="btn main" onClick={guest}>🎲 Jugar sin cuenta</button>
-        <p style={{ fontSize: 13, color: '#9aa3b8' }}>Tus partidas se guardan en este navegador. Si cierras sesión o borras los datos del navegador, se pierden.</p>
       </div>
     </div>
   );
@@ -74,7 +74,7 @@ function Menu({ user, onOpen, onNew }) {
         <div key={c.id} className="card">
           <b>{c.title}</b> {c.data.dead && <span className="tag">💀 muerto</span>}
           <div style={{ fontSize: 13, color: '#9aa3b8' }}>
-            {c.data.name} · {c.data.region} · {c.data.clock && E.clockText(c.data)} · {E.DIFF[c.data.diff]?.label}
+            {c.data.name} · {c.data.stage ? c.data.stage + ' · ' : ''}{c.data.region} · {c.data.clock && E.clockText(c.data)} · {E.DIFF[c.data.diff]?.label}
           </div>
           <div className="row" style={{ marginTop: 8 }}>
             <button className="btn" onClick={() => onOpen(c)}>Continuar</button>
@@ -87,16 +87,23 @@ function Menu({ user, onOpen, onNew }) {
 }
 
 function Create({ onDone, onCancel }) {
+  const medieval = E.ERAS.find((e) => e.id === 'medieval');
   const [f, setF] = useState({
-    title: '', name: '', worldType: 'realista', region: E.REGIONS[0].n, year: 2024, currency: '€', age: 25,
-    archetype: 'nada', freeform: '', backstory: '', diff: 'medio', scale: 'dia', lang: 'es', model: 'claude-haiku',
+    title: '', name: '', worldType: 'historico', stage: medieval.id, region: medieval.r[0], year: medieval.y, era: 'dc', age: 25,
+    archetype: 'nada', freeform: '', backstory: '', diff: 'medio', scale: 'momento', lang: 'es', model: 'claude-haiku',
   });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const pickRegion = (e) => {
-    const r = E.REGIONS.find((x) => x.n === e.target.value);
-    setF(r ? { ...f, region: r.n, year: r.y, currency: r.c } : { ...f, region: e.target.value });
+  const pickStage = (e) => {
+    const s = E.ERAS.find((x) => x.id === e.target.value);
+    setF({ ...f, stage: s.id, region: s.r[0], year: Math.abs(s.y), era: s.y < 0 ? 'ac' : 'dc' });
   };
-  const hist = f.worldType === 'realista' || f.worldType === 'pasado';
+  const pickWorld = (e) => {
+    const w = e.target.value;
+    if (w === 'historico') setF({ ...f, worldType: w, region: medieval.r[0], year: medieval.y, era: 'dc', stage: medieval.id });
+    else setF({ ...f, worldType: w, region: '', year: w === 'futurista' ? 2350 : 1000, era: 'dc' });
+  };
+  const hist = f.worldType === 'historico';
+  const stage = E.ERAS.find((x) => x.id === f.stage);
   const ar = E.ARCHETYPES.find((a) => a.id === f.archetype);
   return (
     <div className="wrap">
@@ -105,24 +112,27 @@ function Create({ onDone, onCancel }) {
         <label>Nombre de la partida</label><input value={f.title} onChange={set('title')} />
         <label>Nombre del personaje</label><input value={f.name} onChange={set('name')} />
         <label>Edad</label><input type="number" value={f.age} onChange={set('age')} />
+      </div>
+      <div className="card">
         <label>Tipo de mundo</label>
-        <select value={f.worldType} onChange={set('worldType')}>{Object.entries(E.WORLDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-        <label>{hist ? 'País / región / época (elige o escribe)' : 'Describe la región del mundo'}</label>
-        {hist ? (
-          <>
-            <input list="regs" value={f.region} onChange={pickRegion} />
-            <datalist id="regs">{E.REGIONS.map((r) => <option key={r.n} value={r.n} />)}</datalist>
-          </>
-        ) : <input value={f.region} onChange={set('region')} placeholder="p. ej. Reino de Valdoria, frontera norte" />}
-        <div className="row">
-          <div style={{ flex: 1 }}><label>Año de inicio</label><input type="number" value={f.year} onChange={set('year')} /></div>
-          <div style={{ flex: 1 }}><label>Moneda</label><input value={f.currency} onChange={set('currency')} /></div>
+        <select value={f.worldType} onChange={pickWorld}>{Object.entries(E.WORLDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        {hist && (<>
+          <label>Etapa histórica</label>
+          <select value={f.stage} onChange={pickStage}>{E.ERAS.map((e) => <option key={e.id} value={e.id}>{e.n}</option>)}</select>
+        </>)}
+        <label>{hist ? 'País / ciudad / región (elige o escribe)' : 'Describe la región del mundo'}</label>
+        <input list="regs" value={f.region} onChange={set('region')} placeholder={hist ? '' : 'p. ej. Reino de Valdoria, frontera norte'} />
+        {hist && stage && <datalist id="regs">{stage.r.map((r) => <option key={r} value={r} />)}</datalist>}
+        <div className="row" style={{ flexWrap: 'nowrap' }}>
+          <div style={{ flex: 2 }}><label>Año</label><input type="number" min="1" value={f.year} onChange={set('year')} /></div>
+          <div style={{ flex: 1 }}><label>Era</label>
+            <select value={f.era} onChange={set('era')}><option value="ac">a.C.</option><option value="dc">d.C.</option></select></div>
         </div>
       </div>
       <div className="card">
-        <label>Personaje</label>
+        <label>Clase / personaje</label>
         <select value={f.archetype} onChange={set('archetype')}>{E.ARCHETYPES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
-        <div style={{ fontSize: 13, color: '#9aa3b8' }}>{ar.desc}</div>
+        <div style={{ fontSize: 13, color: '#9aa3b8' }}>{ar.desc} Empiezas con {E.fmtMoney(ar.money)} y: {ar.inv.map(([n, q]) => q + '× ' + n).join(', ')}.</div>
         {ar.free && (<><label>Descríbete (la IA lo tendrá en cuenta)</label><textarea rows={3} value={f.freeform} onChange={set('freeform')} /></>)}
         <label>Trasfondo (tiene consecuencias reales en la historia)</label>
         <textarea rows={3} value={f.backstory} onChange={set('backstory')} placeholder="Familia, deudas, enemigos, secretos…" />
@@ -130,7 +140,7 @@ function Create({ onDone, onCancel }) {
       <div className="card">
         <label>Dificultad</label>
         <select value={f.diff} onChange={set('diff')}>{Object.entries(E.DIFF).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
-        <label>Cada turno avanza…</label>
+        <label>Cada turno avanza… (se puede cambiar durante la partida)</label>
         <select value={f.scale} onChange={set('scale')}>{Object.entries(E.SCALES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
         <label>Idioma de la partida</label>
         <select value={f.lang} onChange={set('lang')}><option value="es">Castellano</option><option value="ca">Català</option></select>
@@ -138,7 +148,7 @@ function Create({ onDone, onCancel }) {
         <select value={f.model} onChange={set('model')}>{E.MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
       </div>
       <div className="row">
-        <button className="btn main" disabled={!f.name} onClick={() => onDone(E.newGame(f))}>Empezar</button>
+        <button className="btn main" disabled={!f.name || !f.region} onClick={() => onDone(E.newGame(f))}>Empezar</button>
         <button className="btn" onClick={onCancel}>Cancelar</button>
       </div>
     </div>
@@ -152,9 +162,9 @@ function Rows({ items, cols, onChange, blank }) {
       {items.map((it, i) => (
         <div key={i} className="row" style={{ marginBottom: 6, flexWrap: 'nowrap' }}>
           {cols.map(([k, ph, type]) => (
-            <input key={k} placeholder={ph} type={type || 'text'} value={it[k] ?? ''}
+            <input key={k} placeholder={ph} title={ph} type={type || 'text'} value={it[k] ?? ''}
               onChange={(e) => upd(i, k, type === 'number' ? Number(e.target.value) : e.target.value)}
-              style={{ flex: type === 'number' ? '0 0 70px' : 1, minWidth: 0 }} />
+              style={{ flex: type === 'number' ? '0 0 82px' : 1, minWidth: 0 }} />
           ))}
           <button className="btn small danger" onClick={() => onChange(items.filter((_, j) => j !== i))}>✕</button>
         </div>
@@ -169,11 +179,63 @@ const Bar = ({ label, v, color }) => (
     <div className="bar"><div style={{ width: v + '%', background: color }} /></div>
   </div>
 );
+const Hint = ({ children }) => <p style={{ fontSize: 12, color: '#9aa3b8', margin: '4px 0 8px' }}>{children}</p>;
+
+function Economy({ g, up }) {
+  const e = E.economyRows(g);
+  const inc = (g.economy || []).filter((x) => x.type === 'income');
+  const exp = (g.economy || []).filter((x) => x.type !== 'income');
+  const setEco = (type, list) => up((n) => { const other = (n.economy || []).filter((x) => (type === 'income' ? x.type !== 'income' : x.type === 'income')); n.economy = [...other, ...list.map((x) => ({ ...x, type }))]; });
+  const Table = ({ title, rows, total, sign }) => (
+    <table style={{ marginBottom: 10 }}>
+      <thead><tr><th>{title}</th><th>Por día</th><th>Por mes</th></tr></thead>
+      <tbody>
+        {rows.map((r, i) => <tr key={i}><td>{r.concept}</td><td>{sign}{E.fmtMoney(r.perDay)}</td><td>{sign}{E.fmtMoney(r.perDay * 30)}</td></tr>)}
+        {!rows.length && <tr><td colSpan={3} style={{ color: '#9aa3b8' }}>Nada</td></tr>}
+        <tr><td><b>Total</b></td><td><b>{sign}{E.fmtMoney(total)}</b></td><td><b>{sign}{E.fmtMoney(total * 30)}</b></td></tr>
+      </tbody>
+    </table>
+  );
+  return (
+    <div>
+      <Table title="Ingresos" rows={e.inc} total={e.ti} sign="+" />
+      <Table title="Gastos" rows={e.exp} total={e.te} sign="−" />
+      <p style={{ color: e.net >= 0 ? '#7ee0a5' : '#ff9aa9' }}><b>Balance: {e.net >= 0 ? '+' : ''}{E.fmtMoney(e.net)} al día · {e.net >= 0 ? '+' : ''}{E.fmtMoney(e.net * 30)} al mes</b></p>
+      <Hint>Se cobra y se paga solo en cada turno según el tiempo que pasa. Cantidades en cobres por día.</Hint>
+      <label>Editar ingresos</label>
+      <Rows items={inc} blank={{ concept: '', perDay: 0 }} cols={[['concept', 'Concepto'], ['perDay', 'cobres/día', 'number']]} onChange={(v) => setEco('income', v)} />
+      <label>Editar gastos</label>
+      <Rows items={exp} blank={{ concept: '', perDay: 0 }} cols={[['concept', 'Concepto'], ['perDay', 'cobres/día', 'number']]} onChange={(v) => setEco('expense', v)} />
+    </div>
+  );
+}
+
+function Ranking({ g }) {
+  const me = E.playerRank(g);
+  const list = g.ranking || [];
+  const rows = [];
+  let placed = false;
+  list.forEach((r, i) => {
+    if (!placed && me.inTop && i + 1 === me.pos) { rows.push({ me: true }); placed = true; }
+    rows.push(r);
+  });
+  return (
+    <div>
+      <p>Tu patrimonio (dinero + propiedades): <b>{E.fmtMoney(me.worth)}</b></p>
+      <p>{me.inTop ? <b style={{ color: '#7ee0a5' }}>Estás en el puesto #{me.pos} de los más ricos.</b> : <>Fuera del top 100. Te faltan <b>{E.fmtMoney(me.need)}</b> para entrar.</>}</p>
+      <table><thead><tr><th>#</th><th>Nombre</th><th>Fortuna</th></tr></thead>
+        <tbody>{rows.slice(0, 101).map((r, i) => r.me
+          ? <tr key="me" style={{ background: '#2b3350' }}><td>{me.pos}</td><td><b>{g.name} (tú)</b></td><td>{E.fmtMoney(me.worth)}</td></tr>
+          : <tr key={i}><td>{list.indexOf(r) + 1}</td><td>{r.name}{r.title ? <span style={{ color: '#9aa3b8' }}> · {r.title}</span> : ''}</td><td>{E.fmtMoney(r.wealth)}</td></tr>)}
+        </tbody></table>
+    </div>
+  );
+}
 
 function Panels({ g, setG, admin }) {
   const [tab, setTab] = useState('estado');
   const [json, setJson] = useState('');
-  const tabs = [['estado', 'Estado'], ['inv', 'Inventario'], ['hab', 'Habilidades'], ['pnj', 'PNJ'], ['mapa', 'Mapa'], ['fac', 'Facciones'], ['mem', 'Memoria']];
+  const tabs = [['estado', 'Estado'], ['inv', 'Inventario'], ['prop', 'Propiedades'], ['eco', 'Economía'], ['rank', 'Ranking'], ['hab', 'Habilidades'], ['pnj', 'PNJ'], ['fac', 'Facciones'], ['mapa', 'Mapa'], ['mem', 'Memoria']];
   if (admin) tabs.push(['admin', 'Admin']);
   const up = (fn) => { const n = JSON.parse(JSON.stringify(g)); fn(n); setG(n); };
   return (
@@ -184,25 +246,38 @@ function Panels({ g, setG, admin }) {
           <Bar label="Salud" v={g.physical.health} color="#4cc38a" />
           <Bar label="Hambre" v={g.physical.hunger} color="#e5a03a" />
           <Bar label="Cansancio" v={g.physical.fatigue} color="#6c8cff" />
-          <p>💰 <b>{g.wealth.amount} {g.wealth.currency}</b> · Edad {E.ageOf(g)}</p>
+          <p>💰 <b>{E.fmtMoney(g.wealth.amount)}</b> · Edad {E.ageOf(g)}</p>
           <table><tbody>{Object.entries(g.attrs).map(([k, v]) => (
             <tr key={k}><td>{E.ATTRS[k]}</td><td><input type="number" value={v} style={{ width: 70 }} onChange={(e) => up((n) => (n.attrs[k] = Number(e.target.value)))} /></td></tr>
           ))}</tbody></table>
           <label>Salud / hambre / cansancio (editable)</label>
           <div className="row">{['health', 'hunger', 'fatigue'].map((k) => <input key={k} type="number" style={{ width: 80 }} value={g.physical[k]} onChange={(e) => up((n) => (n.physical[k] = E.clamp(e.target.value)))} />)}</div>
-          <label>Dinero</label>
-          <div className="row"><input type="number" style={{ width: 120 }} value={g.wealth.amount} onChange={(e) => up((n) => (n.wealth.amount = Number(e.target.value)))} /><input style={{ width: 120 }} value={g.wealth.currency} onChange={(e) => up((n) => (n.wealth.currency = e.target.value))} /></div>
+          <label>Dinero en cobres (1 plata = 1000, 1 oro = 1.000.000)</label>
+          <input type="number" value={g.wealth.amount} onChange={(e) => up((n) => (n.wealth.amount = Math.max(0, Math.round(Number(e.target.value) || 0))))} />
         </div>
       )}
       {tab === 'inv' && <Rows items={g.inventory} blank={{ name: '', qty: 1, note: '' }} cols={[['name', 'Objeto'], ['qty', 'Cant.', 'number'], ['note', 'Nota']]} onChange={(v) => up((n) => (n.inventory = v))} />}
+      {tab === 'prop' && (
+        <div>
+          {(g.properties || []).length > 0 && (
+            <table style={{ marginBottom: 10 }}><thead><tr><th>Propiedad</th><th>Valor</th><th>Renta/día</th></tr></thead>
+              <tbody>{g.properties.map((p, i) => <tr key={i}><td>{p.name}</td><td>{E.fmtMoney(p.value)}</td><td>{E.fmtMoney((p.incomePerDay || 0) - (p.upkeepPerDay || 0))}</td></tr>)}</tbody></table>
+          )}
+          <Hint>Valor, ingreso y mantenimiento en cobres (por día).</Hint>
+          <Rows items={g.properties || []} blank={{ name: '', value: 0, incomePerDay: 0, upkeepPerDay: 0, note: '' }}
+            cols={[['name', 'Propiedad'], ['value', 'Valor', 'number'], ['incomePerDay', 'Ingreso/día', 'number'], ['upkeepPerDay', 'Gasto/día', 'number']]} onChange={(v) => up((n) => (n.properties = v))} />
+        </div>
+      )}
+      {tab === 'eco' && <Economy g={g} up={up} />}
+      {tab === 'rank' && <Ranking g={g} />}
       {tab === 'hab' && (
         <Rows items={Object.entries(g.skills).map(([name, s]) => ({ name, lvl: s.lvl, xp: s.xp }))} blank={{ name: '', lvl: 1, xp: 0 }}
           cols={[['name', 'Habilidad'], ['lvl', 'Nivel', 'number'], ['xp', 'XP', 'number']]}
           onChange={(v) => up((n) => { n.skills = {}; v.forEach((s) => s.name && (n.skills[s.name] = { lvl: s.lvl, xp: s.xp })); })} />
       )}
       {tab === 'pnj' && <Rows items={g.npcs} blank={{ name: '', role: '', attitude: '', notes: '' }} cols={[['name', 'Nombre'], ['role', 'Papel'], ['attitude', 'Actitud'], ['notes', 'Notas']]} onChange={(v) => up((n) => (n.npcs = v))} />}
+      {tab === 'fac' && <Rows items={g.factions} blank={{ name: '', rep: 0, desc: '' }} cols={[['name', 'Facción'], ['rep', 'Rep.', 'number'], ['desc', 'Descripción']]} onChange={(v) => up((n) => (n.factions = v))} />}
       {tab === 'mapa' && (<><p>📍 Ahora: <b>{g.location}</b></p><Rows items={g.zones} blank={{ name: '', desc: '' }} cols={[['name', 'Zona'], ['desc', 'Descripción']]} onChange={(v) => up((n) => (n.zones = v))} /></>)}
-      {tab === 'fac' && <Rows items={g.factions} blank={{ name: '', rep: 0 }} cols={[['name', 'Facción'], ['rep', 'Rep.', 'number']]} onChange={(v) => up((n) => (n.factions = v))} />}
       {tab === 'mem' && (
         <div>
           <label>Resumen acumulado (se actualiza cada 5 turnos; editable)</label>
@@ -216,7 +291,7 @@ function Panels({ g, setG, admin }) {
       {tab === 'admin' && (
         <div>
           <p style={{ fontSize: 13 }}>Modo admin: edita el estado completo en JSON.</p>
-          <textarea rows={12} value={json || JSON.stringify({ ...g, log: undefined }, null, 1)} onChange={(e) => setJson(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+          <textarea rows={12} value={json || JSON.stringify({ ...g, log: undefined, ranking: undefined }, null, 1)} onChange={(e) => setJson(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12 }} />
           <button className="btn main small" onClick={() => { try { setG({ ...g, ...JSON.parse(json) }); setJson(''); } catch (e) { alert('JSON no válido'); } }}>Aplicar</button>
         </div>
       )}
@@ -235,6 +310,7 @@ function Game({ camp, onMenu }) {
   gRef.current = g;
   const timer = useRef();
   const started = useRef(false);
+  const lastAct = useRef(null);
 
   useEffect(() => {
     clearTimeout(timer.current);
@@ -243,7 +319,7 @@ function Game({ camp, onMenu }) {
   }, [g, camp.id]);
 
   const turn = useCallback(async (act) => {
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); lastAct.current = act;
     try {
       const cur = JSON.parse(JSON.stringify(gRef.current));
       const rl = act.start ? null : E.rollCheck(cur, act);
@@ -252,10 +328,11 @@ function Game({ camp, onMenu }) {
       try { r = JSON.parse(txt); } catch (e) { throw new Error('Respuesta inválida del narrador. Reintenta.'); }
       const lvl = rl && rl.success && !cur.dead ? E.addXp(cur, act.skill) : null;
       E.applyChanges(cur, r);
-      if (!act.start) { E.advanceClock(cur, cur.scale); E.driftNeeds(cur, cur.scale); }
+      let eco = null;
+      if (!act.start) { E.advanceClock(cur, cur.scale); eco = E.applyEconomy(cur, cur.scale); E.driftNeeds(cur, cur.scale); }
       cur.turns++;
       cur.actions = r.suggestedActions || [];
-      cur.log.push({ action: act.start ? 'Inicio' : act.text, narr: r.narrative, roll: rl, lvl });
+      cur.log.push({ action: act.start ? 'Inicio' : act.text, narr: r.narrative, roll: rl, lvl, eco });
       cur.log = cur.log.slice(-30);
       if (cur.turns % 5 === 0 && !cur.dead) {
         try {
@@ -275,6 +352,7 @@ function Game({ camp, onMenu }) {
   const last = g.log[g.log.length - 1];
   const rl = last && last.roll;
   const setField = (k, v) => setG({ ...g, [k]: v });
+  const sendFree = () => { if (free && !busy) { turn(E.guessCheck(free, g)); setFree(''); } };
 
   if (g.dead) {
     return (
@@ -296,6 +374,7 @@ function Game({ camp, onMenu }) {
     );
   }
 
+  const rank = E.playerRank(g);
   return (
     <div className="wrap">
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -306,16 +385,22 @@ function Game({ camp, onMenu }) {
       <div className="row" style={{ marginTop: 6 }}>
         <span className="tag">📍 {g.location}</span>
         <span className="tag">❤️ {g.physical.health}</span><span className="tag">🍖 {g.physical.hunger}</span><span className="tag">😴 {g.physical.fatigue}</span>
-        <span className="tag">💰 {g.wealth.amount} {g.wealth.currency}</span>
+        <span className="tag">💰 {E.fmtMoney(g.wealth.amount)}</span>
+        <span className="tag">🏆 {rank.inTop ? '#' + rank.pos : 'fuera del top 100'}</span>
       </div>
       <div className="card">
         {rl && <div className={'roll ' + (rl.success ? 'ok' : 'ko')} title={rl.parts}>🎲 {rl.d20}{rl.bonus >= 0 ? '+' : ''}{rl.bonus} = {rl.total} vs {rl.dc} → {rl.crit ? 'CRÍTICO' : rl.fumble ? 'PIFIA' : rl.success ? 'ÉXITO' : 'FALLO'}</div>}
         {rl && <div style={{ fontSize: 12, color: '#9aa3b8', marginBottom: 6 }}>{rl.parts}</div>}
         {last && last.lvl && <div className="tag" style={{ marginBottom: 6 }}>⭐ {last.lvl}</div>}
         <div className="narr">{busy && !last ? 'El narrador prepara la escena…' : last && last.narr}</div>
+        {last && last.eco && <div style={{ fontSize: 13, color: '#e5a03a', marginTop: 6 }}>💰 {last.eco}</div>}
         {busy && last && <div style={{ color: '#9aa3b8' }}>…</div>}
       </div>
-      {err && <div className="card" style={{ color: '#ff9aa9' }}>{err} <button className="btn small" onClick={() => turn({ start: g.turns === 0 })}>Reintentar</button></div>}
+      {err && <div className="card" style={{ color: '#ff9aa9' }}>{err} <button className="btn small" onClick={() => turn(lastAct.current || { start: true })}>Reintentar</button></div>}
+      <div className="row" style={{ flexWrap: 'nowrap', marginBottom: 8 }}>
+        <span style={{ fontSize: 13, color: '#9aa3b8', whiteSpace: 'nowrap' }}>⏱ Este turno:</span>
+        <select value={g.scale} onChange={(e) => setField('scale', e.target.value)}>{Object.entries(E.SCALES).map(([k, v]) => <option key={k} value={k}>{v.label}{k === 'momento' ? ` (ahora: ${E.MOMENTS[g.clock.moment]})` : ''}</option>)}</select>
+      </div>
       <div style={{ display: 'grid', gap: 8 }}>
         {(g.actions || []).map((a, i) => (
           <button key={i} className="btn" disabled={busy} onClick={() => turn(a)}>
@@ -323,14 +408,12 @@ function Game({ camp, onMenu }) {
           </button>
         ))}
         <div className="row" style={{ flexWrap: 'nowrap' }}>
-          <input value={free} placeholder="Otra acción…" onChange={(e) => setFree(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && free && !busy) { turn({ text: free, attr: 'des', risk: 'medio' }); setFree(''); } }} />
-          <button className="btn main" disabled={busy || !free} onClick={() => { turn({ text: free, attr: 'des', risk: 'medio' }); setFree(''); }}>▶</button>
+          <input value={free} placeholder="Escribe lo que quieras hacer…" onChange={(e) => setFree(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendFree(); }} />
+          <button className="btn main" disabled={busy || !free} onClick={sendFree}>▶</button>
         </div>
       </div>
       <div className="card">
         <div className="row">
-          <div style={{ flex: 1 }}><label>Tiempo por turno</label>
-            <select value={g.scale} onChange={(e) => setField('scale', e.target.value)}>{Object.entries(E.SCALES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
           <div style={{ flex: 1 }}><label>Narrador</label>
             <select value={g.model} onChange={(e) => setField('model', e.target.value)}>{E.MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></div>
           <div style={{ flex: 1 }}><label>Idioma</label>
