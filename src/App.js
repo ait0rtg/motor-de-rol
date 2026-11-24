@@ -26,6 +26,11 @@ function Auth() {
     if (r.error) setMsg(r.error.message);
     else if (mode === 'up' && !r.data.session) setMsg('Cuenta creada. Revisa tu correo para confirmarla y luego entra.');
   };
+  const guest = async () => {
+    setMsg('');
+    const r = await sb.auth.signInAnonymously();
+    if (r.error) setMsg(r.error.message);
+  };
   return (
     <div className="wrap">
       <h1>⚔️ Motor de Rol</h1>
@@ -39,6 +44,10 @@ function Auth() {
           <button className="btn" onClick={() => setMode(mode === 'in' ? 'up' : 'in')}>{mode === 'in' ? 'No tengo cuenta' : 'Ya tengo cuenta'}</button>
         </div>
         {msg && <p style={{ color: '#ff9aa9' }}>{msg}</p>}
+      </div>
+      <div className="card">
+        <button className="btn main" onClick={guest}>🎲 Jugar sin cuenta</button>
+        <p style={{ fontSize: 13, color: '#9aa3b8' }}>Tus partidas se guardan en este navegador. Si cierras sesión o borras los datos del navegador, se pierden.</p>
       </div>
     </div>
   );
@@ -56,7 +65,7 @@ function Menu({ user, onOpen, onNew }) {
     <div className="wrap">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h1>⚔️ Mis partidas</h1>
-        <button className="btn small" onClick={() => sb.auth.signOut()}>Salir ({user.email})</button>
+        <button className="btn small" onClick={() => { if (!user.is_anonymous || window.confirm('Eres invitado: si sales, perderás tus partidas. ¿Salir?')) sb.auth.signOut(); }}>Salir ({user.is_anonymous ? 'invitado' : user.email})</button>
       </div>
       <button className="btn main" onClick={onNew}>＋ Nueva partida</button>
       {list === null && <p>Cargando…</p>}
